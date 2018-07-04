@@ -3,7 +3,7 @@
 With an excel spreadsheet LIMS request, run QC analyses on isolates
 
 ### Example run command on MDU servers:
-`pando LIMS_DATA_20160801.xlsx`
+`pando run LIMS_DATA_20160801.xlsx`
 
 
 ### Get help:
