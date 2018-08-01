@@ -78,9 +78,8 @@ SUBPARSER_ARGS1.add_argument('-m', '--metadata_run', help='Gather metadata for a
 SUBPARSER_ARGS1.add_argument('-s', '--model_andi_distance', help='Substitution model.\
                     \'Raw\', \'JC\', or \'Kimura\'.',
                     default='JC', required=False)
-SUBPARSER_ARGS1.add_argument('-c', '--percent_cutoff', help='For abricate, call the\
-                    gene \'present\' if greater than this value and \'maybe\'\
-                    if less than this value.', default=95, type=int, required=False)
+SUBPARSER_ARGS1.add_argument('-c', '--cov_cutoff', help='Reference gene coverage cutoff for abricate hits', default=95, type=float, required=False)
+SUBPARSER_ARGS1.add_argument('-i', '--id_cutoff', help='Reference gene identity cutoff for abricate hits', default=95, type=float, required=False)
 SUBPARSER_MODULES = PARSER.add_subparsers(title="Sub-commands help",
                                           help="",
                                           metavar="",
@@ -172,16 +171,28 @@ class Isolate(object):
                     os.system('mkdir -p '+abricate_outfolder)
                     os.system('abricate '+contigs_path+' > '+abricate_outfile)
             ab_data = pd.read_table(abricate_outfile, sep='\t', header=0)
-        nrows = ab_data.shape[0]
-        genes = ab_data['GENE'].tolist()
-        cov = ab_data['%COVERAGE'].tolist()
+#         print(ab_data)
+#         nrows = ab_data.shape[0]
+#         genes = ab_data['GENE'].tolist()
+#         cov = ab_data['%COVERAGE'].tolist()
+#         print(cov)
+#         print(ab_data)
         yes = []
         maybe = []
-        for i in range(0, nrows):
-            if cov[i] >= ARGS.percent_cutoff:
-                yes.append('resgene_'+genes[i])
+#         print(ab_data.shape)
+#         print(ab_data)
+#             pass
+#         else:
+        for i in ab_data.index.values:
+#             print(ab_data.loc[i, '%COVERAGE'])
+#                 print(ab_data.loc[i, '%COVERAGE'])
+#             if pd.notnull(ab_data.loc[i, '%COVERAGE']):
+            if ab_data.loc[i, '%COVERAGE'] >= ARGS.cov_cutoff and ab_data.loc[i, '%IDENTITY'] >= ARGS.id_cutoff:
+                print(f"yes, {ab_data.loc[i,]}")
+#                 yes.append('resgene_'+genes[i])
             else:
-                maybe.append('resgene_'+genes[i])
+                print(f"maybe, {ab_data.loc[i, ]}")
+#                 maybe.append('resgene_'+genes[i])
         y = {key:'yes' for (key) in yes}
         m = {key: 'maybe' for (key) in maybe}
         #Join dictionaries m and y to form ab_results
