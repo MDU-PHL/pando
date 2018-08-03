@@ -43,7 +43,7 @@ import os
 import argparse
 import sys
 import random
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, check_output
 import shlex
 import shutil
 import glob
@@ -59,14 +59,14 @@ PARSER = argparse.ArgumentParser(description='Run QC summary analysis.',
 SUBPARSER_ARGS1 = argparse.ArgumentParser(add_help=False)
 SUBPARSER_ARGS1.add_argument('LIMS_request_sheet', help="Excel spreadsheet LIMS request.")
 SUBPARSER_ARGS1.add_argument('-w', '--wgs_qc', help='Path to WGS QC',
-                    default='/mnt/seq/MDU/QC/', required=False)
+                    default='/home/seq/MDU/QC/', required=False)
 SUBPARSER_ARGS1.add_argument('-N', '--Nullarbor_folders', help='Run this on Nullarbor outdir?',
                             default=False, action="store_true", required=False)
 SUBPARSER_ARGS1.add_argument('-k', '--keep_tempdirs', help='Keep tempdirs created\
                     during run?', default=False, action='store_true',
                     required=False)
 SUBPARSER_ARGS1.add_argument('-d', '--kraken_db', help='Path to Kraken db',
-                             default=os.environ['KRAKEN_DEFAULT_DB'])
+                             default=os.environ['KRAKEN2_DEFAULT_DB'])
 SUBPARSER_ARGS1.add_argument("-t", "--threads", help='Number of threads',
                     default=cpu_count(), type=int, required=False)
 SUBPARSER_ARGS1.add_argument('-a', '--andi_run', help='Run andi phylogenomic analysis?\
@@ -78,8 +78,13 @@ SUBPARSER_ARGS1.add_argument('-m', '--metadata_run', help='Gather metadata for a
 SUBPARSER_ARGS1.add_argument('-s', '--model_andi_distance', help='Substitution model.\
                     \'Raw\', \'JC\', or \'Kimura\'.',
                     default='JC', required=False)
-SUBPARSER_ARGS1.add_argument('-c', '--cov_cutoff', help='Reference gene coverage cutoff for abricate hits', default=95, type=float, required=False)
-SUBPARSER_ARGS1.add_argument('-i', '--id_cutoff', help='Reference gene identity cutoff for abricate hits', default=95, type=float, required=False)
+SUBPARSER_ARGS1.add_argument('-c', '--cov_cutoff',
+                             help='''Reference gene coverage
+                             cutoff for abricate hits''',
+                             default=100, type=float, required=False)
+SUBPARSER_ARGS1.add_argument('-i', '--id_cutoff', help='''Reference gene
+                             identity cutoff for abricate hits''',
+                             default=100, type=float, required=False)
 SUBPARSER_MODULES = PARSER.add_subparsers(title="Sub-commands help",
                                           help="",
                                           metavar="",
@@ -188,11 +193,11 @@ class Isolate(object):
 #                 print(ab_data.loc[i, '%COVERAGE'])
 #             if pd.notnull(ab_data.loc[i, '%COVERAGE']):
             if ab_data.loc[i, '%COVERAGE'] >= ARGS.cov_cutoff and ab_data.loc[i, '%IDENTITY'] >= ARGS.id_cutoff:
-                print(f"yes, {ab_data.loc[i,]}")
-#                 yes.append('resgene_'+genes[i])
+#                 print(f"yes, {ab_data.loc[i,]}")
+                yes.append('resgene_'+ab_data.loc[i, 'GENE'])
             else:
-                print(f"maybe, {ab_data.loc[i, ]}")
-#                 maybe.append('resgene_'+genes[i])
+#                 print(f"maybe, {ab_data.loc[i, ]}")
+                maybe.append('resgene_'+ab_data.loc[i, 'GENE'])
         y = {key:'yes' for (key) in yes}
         m = {key: 'maybe' for (key) in maybe}
         #Join dictionaries m and y to form ab_results
@@ -263,22 +268,17 @@ class Isolate(object):
         Get the kraken best hit from reads.
         '''
         #Pipe these commands together
-        cmd_grep = "grep -P '\tS\t' "+ARGS.wgs_qc+'/'+self.ID+"/kraken.tab"
+        cmd_grep = "grep -P '\tS\t' "+ARGS.wgs_qc+'/'+self.ID+"/kraken2.tab"
+        cmd_sed  = "sed -e 's/%//g'"
         cmd_sort = 'sort -k 1 -g -r'
         cmd_head = 'head -3'
-        #Split the cmds using shlex, store in args
-        args_grep = shlex.split(cmd_grep)
-        args_sort = shlex.split(cmd_sort)
-        args_head = shlex.split(cmd_head)
-
-        #Pipe the output of one args to another
-        proc1 = Popen(args_grep, stdout=PIPE)
-        proc2 = Popen(args_sort, stdin=proc1.stdout, stdout=PIPE)
-        proc3 = Popen(args_head, stdin=proc2.stdout, stdout=PIPE)
-
-        output = proc3.stdout.read().decode('UTF-8')
-        kraken = output.rstrip().split('\n')
-        kraken = [line.strip().split('\t') for line in [_f for _f in kraken if _f]]
+        
+        cmd_full = f"{cmd_grep} | {cmd_sed} | {cmd_sort} | {cmd_head}"
+        sys.stderr.write(cmd_full+'\n')
+        output = check_output(cmd_full, shell=True)
+        output2 = output.decode('UTF-8').split('\n')
+        kraken = [line.strip().split('\t') for line
+                  in [_f for _f in output2 if _f]]
         return kraken
 
     def kraken_contigs(self):
@@ -286,33 +286,45 @@ class Isolate(object):
         Get the kraken best hit from assemblies.
         '''
         #Pipe these commands together
-        cmd_kraken = 'nice kraken --threads 2 --db '+\
-                     os.path.abspath(ARGS.kraken_db)+\
-                     ' --fasta-input '+ARGS.wgs_qc+'/'+self.ID+'/contigs.fa'
-        cmd_krk_r = 'kraken-report'
+        cmd_kraken = f"kraken2 --threads 2 --db " +\
+                     f"{os.path.abspath(ARGS.kraken_db)} " +\
+                     f"--report {self.ID+'_krkn.txt'} --output - " +\
+                     f"--memory-mapping {ARGS.wgs_qc+'/'+self.ID+'/contigs.fa'} " +\
+                     f"&& cat {self.ID+'_krkn.txt'}"
+#         print(cmd_kraken)
         cmd_grep = "grep -P '\tS\t'"
+        cmd_sed  = "sed -e 's/%//g'"
         cmd_sort = 'sort -k 1 -g -r'
         cmd_head = 'head -3'
+        cmd_full = f"{cmd_kraken} | {cmd_grep} | {cmd_sed} | {cmd_sort} | {cmd_head}"
+        sys.stderr.write(cmd_full+'\n')
+        output = check_output(cmd_full, shell=True)
+        output2 = output.decode('UTF-8').split('\n')
+        kraken = [line.strip().split('\t') for line
+                  in [_f for _f in output2 if _f]]
+        print(kraken)
 
-        #Split the cmds using shlex, store in args
-        args_kraken = shlex.split(cmd_kraken)
-        args_krk_report = shlex.split(cmd_krk_r)
-        args_grep = shlex.split(cmd_grep)
-        args_sort = shlex.split(cmd_sort)
-        args_head = shlex.split(cmd_head)
 
-        #Pipe the output of one args to another
-        proc1 = Popen(args_kraken, stdout=PIPE)
-        proc2 = Popen(args_krk_report, stdin=proc1.stdout, stdout=PIPE,
-                      stderr=PIPE)
-        proc3 = Popen(args_grep, stdin=proc2.stdout, stdout=PIPE, stderr=PIPE)
-        proc4 = Popen(args_sort, stdin=proc3.stdout, stdout=PIPE, stderr=PIPE)
-        proc5 = Popen(args_head, stdin=proc4.stdout, stdout=PIPE, stderr=PIPE)
-
-        output = proc5.stdout.read().decode('UTF-8')
-        kraken = output.rstrip().split('\n')
-        kraken = [line.strip().split('\t') for line in [_f for _f in kraken if _f]]
+# 
+#         #Split the cmds using shlex, store in args
+#         args_kraken = shlex.split(cmd_kraken)
+#         args_grep = shlex.split(cmd_grep)
+#         args_sort = shlex.split(cmd_sort)
+#         args_head = shlex.split(cmd_head)
+# 
+#         #Pipe the output of one args to another
+#         proc1 = Popen(args_kraken, stdout=PIPE)
+#         proc2 = Popen(args_grep, stdin=proc1.stdout, stdout=PIPE, stderr=PIPE)
+#         proc3 = Popen(args_sort, stdin=proc2.stdout, stdout=PIPE, stderr=PIPE)
+#         proc4 = Popen(args_head, stdin=proc3.stdout, stdout=PIPE, stderr=PIPE)
+#         print(proc1)
+#         output = proc4.stdout.read().decode('UTF-8')
+#         print(output)
+#         kraken = output.rstrip().split('\n')
+#         kraken = [line.strip().split('\t') for line in [_f for _f in kraken if _f]]
+#         print(kraken)
         return kraken
+#         os.remove(self.ID+'_krkn.txt')
 
     def prokka_contigs(self):
         '''
@@ -640,6 +652,7 @@ def main():
                 p = Pool(ARGS.threads//2)
             print('\nRunning kraken on the assemblies (SPAdes contigs.fa files):')
             results_k_cntgs = p.map(kraken_contigs_multiprocessing, isos)
+            print(results_k_cntgs)
             #concat the dataframe objects
             res_k_cntgs = pd.concat(results_k_cntgs, axis=0, sort=False)
             print('\nKraken_contigs results gathered from kraken on contigs...')
