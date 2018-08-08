@@ -85,6 +85,9 @@ SUBPARSER_ARGS1.add_argument('-c', '--cov_cutoff',
 SUBPARSER_ARGS1.add_argument('-i', '--id_cutoff', help='''Reference gene
                              identity cutoff for abricate hits''',
                              default=100, type=float, required=False)
+SUBPARSER_ARGS1.add_argument('-f', '--assembly_name', help='''Default assembly
+                             name''',
+                             default='spades-fast.fa', required=False)
 SUBPARSER_MODULES = PARSER.add_subparsers(title="Sub-commands help",
                                           help="",
                                           metavar="",
@@ -119,7 +122,7 @@ class Isolate(object):
         Store the path to the assembly, or tell the user if it doesn't exist.
         Write missing IDs to file. Print the filename of missing isolates.
         '''
-        isolate_qc_contigs = os.path.join(ARGS.wgs_qc, self.ID, 'contigs.fa')
+        isolate_qc_contigs = os.path.join(ARGS.wgs_qc, self.ID, ARGS.assembly_name)
         if os.path.exists(isolate_qc_contigs):
             return isolate_qc_contigs
         else:
@@ -129,7 +132,7 @@ class Isolate(object):
         '''
         Return the contig metrics by running 'fa -t'.
         '''
-        os.system('fa -t '+ARGS.wgs_qc+self.ID+'/contigs.fa > '+self.ID+\
+        os.system('fa -t '+ARGS.wgs_qc+self.ID+'/'+ARGS.assembly_name+' > '+self.ID+\
                   '_metrics.txt')
         metrics = [line.rstrip().split('\t') for line in open(self.ID+\
                    '_metrics.txt').readlines()]
@@ -167,7 +170,7 @@ class Isolate(object):
         else: #run abricate.
             abricate_outfolder = 'abricate/'+self.ID
             abricate_outfile = abricate_outfolder+'/abricate.tab'
-            contigs_path = wd+'/contigs.fa'
+            contigs_path = wd+'/'+ARGS.assembly_name
             if os.path.exists(abricate_outfile):
                 pass
             else:
@@ -289,7 +292,7 @@ class Isolate(object):
         cmd_kraken = f"kraken2 --threads 2 --db " +\
                      f"{os.path.abspath(ARGS.kraken_db)} " +\
                      f"--report {self.ID+'_krkn.txt'} --output - " +\
-                     f"--memory-mapping {ARGS.wgs_qc+'/'+self.ID+'/contigs.fa'} " +\
+                     f"--memory-mapping {ARGS.wgs_qc+'/'+self.ID+'/'+ARGS.assembly_name} " +\
                      f"&& cat {self.ID+'_krkn.txt'}"
 #         print(cmd_kraken)
         cmd_grep = "grep -P '\tS\t'"
@@ -303,6 +306,7 @@ class Isolate(object):
         kraken = [line.strip().split('\t') for line
                   in [_f for _f in output2 if _f]]
         print(kraken)
+        os.remove(self.ID+'_krkn.txt')
 
 
 # 
@@ -650,7 +654,7 @@ def main():
                 p = Pool(n_isos)
             else:
                 p = Pool(ARGS.threads//2)
-            print('\nRunning kraken on the assemblies (SPAdes contigs.fa files):')
+            print(f'\nRunning kraken on the assemblies ({ARGS.assembly_name} files):')
             results_k_cntgs = p.map(kraken_contigs_multiprocessing, isos)
             print(results_k_cntgs)
             #concat the dataframe objects
