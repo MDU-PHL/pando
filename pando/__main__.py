@@ -81,10 +81,10 @@ SUBPARSER_ARGS1.add_argument('-s', '--model_andi_distance', help='Substitution m
 SUBPARSER_ARGS1.add_argument('-c', '--cov_cutoff',
                              help='''Reference gene coverage
                              cutoff for abricate hits''',
-                             default=100, type=float, required=False)
+                             default=75, type=float, required=False)
 SUBPARSER_ARGS1.add_argument('-i', '--id_cutoff', help='''Reference gene
                              identity cutoff for abricate hits''',
-                             default=100, type=float, required=False)
+                             default=95, type=float, required=False)
 SUBPARSER_ARGS1.add_argument('-f', '--assembly_name', help='''Default assembly
                              name''',
                              default='spades-fast.fa', required=False)
@@ -385,7 +385,16 @@ def get_isolate_request_IDs(ID_file):
     Reads in the MDU IDs from the request IDs file and returns IDs as a list.
     ID file must contain only one ID per line.
     '''
-    df = pd.read_excel(ID_file, skiprows=0, index_col=0)
+    import subprocess
+    import shlex
+    result = subprocess.check_output(shlex.split(f"file {ID_file}"))
+    mime_type = result.rstrip().decode("UTF-8")
+    if "microsoft" in mime_type.lower():
+        df = pd.read_excel(ID_file, skiprows=0, index_col=0)
+    elif "ascii" in mime_type.lower():
+        df = pd.read_csv(ID_file, skiprows=0, index_col=0)
+    else:
+        sys.exit(f"{ID_file} filetype is {mime_type}.  Save as .csv of .xlsx. Exiting now.")
     return df
 
 def new_IDs(IDs):
