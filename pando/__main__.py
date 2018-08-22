@@ -147,10 +147,13 @@ class Isolate(object):
         '''
         Return the read metrics stored in yield.tab QC file.
         '''
-        yield_data = [line.rstrip().split('\t') for line in open(ARGS.wgs_qc+\
-                      self.ID+'/'+YIELD_FILE).readlines()]
-        yield_data = dict(('metricsReads_'+i[0], i[1]) for i in yield_data[1:])
-        yield_data_df = pd.DataFrame([yield_data], index=[self.ID])
+        if os.path.exists(ARGS.wgs_qc+self.ID+'/'+YIELD_FILE):
+            yield_data = [line.rstrip().split('\t') for line in open(ARGS.wgs_qc+\
+                          self.ID+'/'+YIELD_FILE).readlines()]
+            yield_data = dict(('metricsReads_'+i[0], i[1]) for i in yield_data[1:])
+            yield_data_df = pd.DataFrame([yield_data], index=[self.ID])
+        else:
+            yield_data_df = pd.DataFrame([None], index=[self.ID])
         return yield_data_df
 
     def reads(self):
@@ -164,48 +167,35 @@ class Isolate(object):
         Get abricate results or run abricate.
         '''
         wd = ARGS.wgs_qc+self.ID
-        abricate_path = wd+'/abricate.tab'
-        if os.path.exists(abricate_path):
-            ab_data = pd.read_table(abricate_path, sep='\t', header=0)
-        else: #run abricate.
-            abricate_outfolder = 'abricate/'+self.ID
-            abricate_outfile = abricate_outfolder+'/abricate.tab'
-            contigs_path = wd+'/'+ARGS.assembly_name
-            if os.path.exists(abricate_outfile):
-                pass
-            else:
-                if os.path.exists(contigs_path):
-                    print('running abricate for', self.ID)
-                    os.system('mkdir -p '+abricate_outfolder)
-                    os.system('abricate '+contigs_path+' > '+abricate_outfile)
-            ab_data = pd.read_table(abricate_outfile, sep='\t', header=0)
-#         print(ab_data)
-#         nrows = ab_data.shape[0]
-#         genes = ab_data['GENE'].tolist()
-#         cov = ab_data['%COVERAGE'].tolist()
-#         print(cov)
-#         print(ab_data)
-        yes = []
-        maybe = []
-#         print(ab_data.shape)
-#         print(ab_data)
+        abricate_path = wd+'/resistome.tab'
+#         if os.path.exists(abricate_path):
+#             print(f"reading from {abricate_path}")
+#             ab_data = pd.read_table(abricate_path, sep='\t', header=0)
+#         else: #run abricate.
 #             pass
-#         else:
+        abricate_outfolder = 'abricate/'+self.ID
+        abricate_outfile = abricate_outfolder+'/resistome.tab'
+        contigs_path = wd+'/'+ARGS.assembly_name
+#             if os.path.exists(abricate_outfile):
+#                 pass
+#             else:
+#         if os.path.exists(contigs_path):
+#         print('running abricate for', self.ID)
+        os.system('mkdir -p '+abricate_outfolder)
+        os.system('abricate --version')
+        cmd = f"/home/linuxbrew/singularity/bin/abricate --db ncbi {contigs_path} > {abricate_outfile}"
+        print(cmd)
+        os.system(cmd)
+        ab_data = pd.read_table(abricate_outfile, sep='\t', header=0)
+        ab_results = {}
         for i in ab_data.index.values:
-#             print(ab_data.loc[i, '%COVERAGE'])
-#                 print(ab_data.loc[i, '%COVERAGE'])
-#             if pd.notnull(ab_data.loc[i, '%COVERAGE']):
-            if ab_data.loc[i, '%COVERAGE'] >= ARGS.cov_cutoff and ab_data.loc[i, '%IDENTITY'] >= ARGS.id_cutoff:
-#                 print(f"yes, {ab_data.loc[i,]}")
-                yes.append('resgene_'+ab_data.loc[i, 'GENE'])
+            if ab_data.loc[i, '%COVERAGE'] >= ARGS.cov_cutoff and ab_data.loc[i, '%IDENTITY'] >= ARGS.id_cutoff \
+                and 'resgene_'+ab_data.loc[i, 'GENE'] not in ab_data:
+                    ab_results['resgene_'+ab_data.loc[i, 'GENE']] = 'yes'
             else:
-#                 print(f"maybe, {ab_data.loc[i, ]}")
-                maybe.append('resgene_'+ab_data.loc[i, 'GENE'])
-        y = {key:'yes' for (key) in yes}
-        m = {key: 'maybe' for (key) in maybe}
-        #Join dictionaries m and y to form ab_results
-        import itertools
-        ab_results = dict(itertools.chain(iter(y.items()), iter(m.items())))
+                ab_results['resgene_'+ab_data.loc[i, 'GENE']] = 'maybe'
+#         else:
+#             print(f"{contigs_path} does not exist", file=sys.stderr)
         #Convert to pandas dataframe
         abricate_results = pd.DataFrame([ab_results], index=[self.ID])
         return abricate_results
