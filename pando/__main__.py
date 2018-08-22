@@ -168,23 +168,13 @@ class Isolate(object):
         '''
         wd = ARGS.wgs_qc+self.ID
         abricate_path = wd+'/resistome.tab'
-#         if os.path.exists(abricate_path):
-#             print(f"reading from {abricate_path}")
-#             ab_data = pd.read_table(abricate_path, sep='\t', header=0)
-#         else: #run abricate.
-#             pass
         abricate_outfolder = 'abricate/'+self.ID
         abricate_outfile = abricate_outfolder+'/resistome.tab'
         contigs_path = wd+'/'+ARGS.assembly_name
-#             if os.path.exists(abricate_outfile):
-#                 pass
-#             else:
-#         if os.path.exists(contigs_path):
-#         print('running abricate for', self.ID)
         os.system('mkdir -p '+abricate_outfolder)
         os.system('abricate --version')
         cmd = f"/home/linuxbrew/singularity/bin/abricate --db ncbi {contigs_path} > {abricate_outfile}"
-        print(cmd)
+        print(cmd, file=sys.stderr)
         os.system(cmd)
         ab_data = pd.read_table(abricate_outfile, sep='\t', header=0)
         ab_results = {}
@@ -194,9 +184,6 @@ class Isolate(object):
                     ab_results['resgene_'+ab_data.loc[i, 'GENE']] = 'yes'
             else:
                 ab_results['resgene_'+ab_data.loc[i, 'GENE']] = 'maybe'
-#         else:
-#             print(f"{contigs_path} does not exist", file=sys.stderr)
-        #Convert to pandas dataframe
         abricate_results = pd.DataFrame([ab_results], index=[self.ID])
         return abricate_results
 
