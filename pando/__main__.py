@@ -368,10 +368,10 @@ def get_isolate_request_IDs(ID_file):
     mime_type = result.rstrip().decode("UTF-8")
     if "microsoft" in mime_type.lower():
         df = pd.read_excel(ID_file, skiprows=0, index_col=0)
-    elif "ascii" in mime_type.lower():
+    elif "ascii" or "utf-8" in mime_type.lower():
         df = pd.read_csv(ID_file, skiprows=0, index_col=0)
     else:
-        sys.exit(f"{ID_file} filetype is {mime_type}.  Save as .csv of .xlsx. Exiting now.")
+        sys.exit(f"{ID_file} filetype is {mime_type}.  Exiting.")
     return df
 
 def new_IDs(IDs):
