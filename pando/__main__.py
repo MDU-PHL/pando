@@ -88,6 +88,8 @@ SUBPARSER_ARGS1.add_argument('-i', '--id_cutoff', help='''Reference gene
 SUBPARSER_ARGS1.add_argument('-f', '--assembly_name', help='''Default assembly
                              name''',
                              default='spades-fast.fa', required=False)
+SUBPARSER_ARGS1.add_argument('-s', '--kraken_report', help="Name of kraken report", default="kraken2.tab", require=False)
+SUBPARSER_ARGS1.add_argument('--kraken_version', help="Kraken version", default="2", require=False)
 SUBPARSER_MODULES = PARSER.add_subparsers(title="Sub-commands help",
                                           help="",
                                           metavar="",
@@ -248,7 +250,7 @@ class Isolate(object):
         Get the kraken best hit from reads.
         '''
         #Pipe these commands together
-        cmd_grep = "grep -P '\tS\t' "+ARGS.wgs_qc+'/'+self.ID+"/kraken2.tab"
+        cmd_grep = "grep -P '\tS\t' "+ARGS.wgs_qc+'/'+self.ID+"/"+ARGS.kraken_report
         cmd_sed  = "sed -e 's/%//g'"
         cmd_sort = 'sort -k 1 -g -r'
         cmd_head = 'head -3'
@@ -265,12 +267,19 @@ class Isolate(object):
         '''
         Get the kraken best hit from assemblies.
         '''
+        # Command Kraken1
+        cmd_kraken1 = f"kraken --threads 2 --preload --db " +\
+                      f"{os.path.abspath(ARGS.kraken_db)} " +\
+                      f"| kraken-report --db {os.path.abspath(ARGS.kraken_db)}"
+
         #Pipe these commands together
-        cmd_kraken = f"kraken2 --threads 2 --db " +\
+        cmd_kraken2 = f"kraken2 --threads 2 --db " +\
                      f"{os.path.abspath(ARGS.kraken_db)} " +\
                      f"--report {self.ID+'_krkn.txt'} --output - " +\
                      f"--memory-mapping {ARGS.wgs_qc+'/'+self.ID+'/'+ARGS.assembly_name} " +\
                      f"&& cat {self.ID+'_krkn.txt'}"
+        cmd_kraken = cmd_kraken1 if ARGS.kraken_version == "1" else cmd_kraken2
+
 #         print(cmd_kraken)
         cmd_grep = "grep -P '\tS\t'"
         cmd_sed  = "sed -e 's/%//g'"
@@ -283,7 +292,8 @@ class Isolate(object):
         kraken = [line.strip().split('\t') for line
                   in [_f for _f in output2 if _f]]
         print(kraken)
-        os.remove(self.ID+'_krkn.txt')
+        if os.path.exists(self.ID+'_krkn.txt'):
+            os.remove(self.ID+'_krkn.txt')
 
 
 # 
