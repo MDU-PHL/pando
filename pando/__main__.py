@@ -270,6 +270,7 @@ class Isolate(object):
         # Command Kraken1
         cmd_kraken1 = f"kraken --threads 2 --preload --db " +\
                       f"{os.path.abspath(ARGS.kraken_db)} " +\
+                      f"{ARGS.wgs_qc+'/'+self.ID+'/'+ARGS.assembly_name} " +\
                       f"| kraken-report --db {os.path.abspath(ARGS.kraken_db)}"
 
         #Pipe these commands together
