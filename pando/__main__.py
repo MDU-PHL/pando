@@ -88,8 +88,8 @@ SUBPARSER_ARGS1.add_argument('-i', '--id_cutoff', help='''Reference gene
 SUBPARSER_ARGS1.add_argument('-f', '--assembly_name', help='''Default assembly
                              name''',
                              default='spades-fast.fa', required=False)
-SUBPARSER_ARGS1.add_argument('-s', '--kraken_report', help="Name of kraken report", default="kraken2.tab", require=False)
-SUBPARSER_ARGS1.add_argument('--kraken_version', help="Kraken version", default="2", require=False)
+SUBPARSER_ARGS1.add_argument('-s', '--kraken_report', help="Name of kraken report", default="kraken2.tab", required=False)
+SUBPARSER_ARGS1.add_argument('--kraken_version', help="Kraken version", default="2", required=False)
 SUBPARSER_MODULES = PARSER.add_subparsers(title="Sub-commands help",
                                           help="",
                                           metavar="",
