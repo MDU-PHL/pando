@@ -373,16 +373,14 @@ def get_isolate_request_IDs(ID_file):
     Reads in the MDU IDs from the request IDs file and returns IDs as a list.
     ID file must contain only one ID per line.
     '''
-    import subprocess
-    import shlex
-    result = subprocess.check_output(shlex.split(f"file {ID_file}"))
-    mime_type = result.rstrip().decode("UTF-8")
-    if "microsoft" in mime_type.lower():
+    try:
         df = pd.read_excel(ID_file, skiprows=0, index_col=0)
-    elif "ascii" or "utf-8" in mime_type.lower():
-        df = pd.read_csv(ID_file, skiprows=0, index_col=0)
-    else:
-        sys.exit(f"{ID_file} filetype is {mime_type}.  Exiting.")
+    except:
+        try:
+            df = pd.read_csv(ID_file, skiprows=0, index_col=0)
+        except:
+            sys.exit(f"{ID_file} filetype is not supported.  Exiting.")
+            raise
     return df
 
 def new_IDs(IDs):
